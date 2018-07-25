@@ -207,6 +207,93 @@ def convert_convolution(node, **kwargs):
     return [conv_node]
 
 
+@mx_op.register("Deconvolution")
+def convert_deconvolution(node, **kwargs):
+    """Map MXNet's deconvolution operator attributes to onnx's ConvTranspose operator
+    and return the created node.
+    """
+    helper, _, _ = import_onnx_modules()
+    name = node["name"]
+    inputs = node["inputs"]
+
+    num_inputs = len(inputs)
+
+    proc_nodes = kwargs["proc_nodes"]
+    input_node = proc_nodes[kwargs["index_lookup"][inputs[0][0]]].name
+    weights_node = proc_nodes[kwargs["index_lookup"][inputs[1][0]]].name
+
+    if num_inputs > 2:
+        bias_node = proc_nodes[kwargs["index_lookup"][inputs[2][0]]].name
+
+    attrs = node.get("attrs")
+
+    kernel_dims = list(parse_helper(attrs, "kernel"))
+    stride_dims = list(parse_helper(attrs, "stride", [1, 1]))
+    pad_dims = list(parse_helper(attrs, "pad", [0, 0]))
+    num_group = int(attrs.get("num_group", 1))
+    dilations = list(parse_helper(attrs, "dilate", [1, 1]))
+    adj_dims = list(parse_helper(attrs, "adj"))
+    # target_dims = list(parse_helper(attrs, "target_shape"))
+
+    pad_dims = pad_dims + pad_dims
+
+    input_nodes = [input_node, weights_node]
+    if num_inputs > 2:
+        input_nodes.append(bias_node)
+
+    conv_node = helper.make_node(
+        "ConvTranspose",
+        inputs=input_nodes,
+        outputs=[name],
+        kernel_shape=kernel_dims,
+        strides=stride_dims,
+        dilations=dilations,
+        output_padding=adj_dims,
+        # output_shape=target_dims,
+        pads=pad_dims,
+        group=num_group,
+        name=name
+    )
+
+    return [conv_node]
+
+
+@mx_op.register("Crop")
+def convert_crop(node, **kwargs):
+    """Map MXNet's crop operator attributes to onnx's Crop operator
+    and return the created node.
+    """
+    helper, _, _ = import_onnx_modules()
+    name = node["name"]
+    inputs = node["inputs"]
+
+    num_inputs = len(inputs)
+
+    proc_nodes = kwargs["proc_nodes"]
+    input_node = proc_nodes[kwargs["index_lookup"][inputs[0][0]]].name
+
+    attrs = node.get("attrs")
+
+    x, y = list(parse_helper(attrs, "offset"))
+    h, w = list(parse_helper(attrs, "h_w", [0, 0]))
+    if num_inputs > 1:
+        h, w = kwargs['in_shape'][0][-2:]
+
+    border = [y, x, y + h, x + w]
+    scale = [1, 1]
+
+    conv_node = helper.make_node(
+        "Crop",
+        inputs=[input_node],
+        outputs=[name],
+        border=border,
+        scale=scale,
+        name=name
+    )
+
+    return [conv_node]
+
+
 @mx_op.register("FullyConnected")
 def convert_fully_connected(node, **kwargs):
     """Map MXNet's FullyConnected operator attributes to onnx's Gemm operator
@@ -612,7 +699,7 @@ def convert_pooling(node, **kwargs):
     attrs = node["attrs"]
     kernel = eval(attrs["kernel"])
     pool_type = attrs["pool_type"]
-    stride = eval(attrs["stride"]) if attrs.get("stride") else None
+    stride = eval(attrs["stride"]) if attrs.get("stride") else (1 ,1)
     global_pool = True if "global_pool" in attrs and\
                           attrs.get("global_pool") == "True" else False
     node_inputs = node["inputs"]
