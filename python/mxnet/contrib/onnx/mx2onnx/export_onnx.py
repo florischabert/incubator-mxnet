@@ -227,6 +227,11 @@ class MXNetGraph(object):
         # Determine output shape
         output_shape = MXNetGraph.infer_output_shape(sym, params, in_shape, output_label)
 
+        # Determine intermediary shapes
+        input_names = [n for n in sym.list_inputs() if n not in params]
+        input_pairs = {n: in_shape[i] for i, n in enumerate(input_names)}
+        _, out_shapes, _ = sym.get_internals().infer_shape(**input_pairs)
+
         weights = MXNetGraph.convert_weights_to_numpy(params)
 
         mx_graph = json.loads(sym.tojson())["nodes"]
@@ -249,7 +254,6 @@ class MXNetGraph(object):
             # in params dict
             if op == "null" and name not in params:
                 # Handling graph input
-
                 # Skipping output_label node, as this node is not part of graph
                 # Refer "output_label" assignment above for more details.
                 if name == output_label:
@@ -261,6 +265,7 @@ class MXNetGraph(object):
                     weights=weights,
                     in_shape=in_shape[graph_input_idx],
                     in_type=in_type,
+                    out_shape=out_shapes[idx],
                     proc_nodes=all_processed_nodes,
                     initializer=initializer,
                     index_lookup=index_lookup)
@@ -275,6 +280,7 @@ class MXNetGraph(object):
                     weights=weights,
                     in_shape=in_shape,
                     in_type=in_type,
+                    out_shape=out_shapes[idx],
                     proc_nodes=all_processed_nodes,
                     initializer=initializer,
                     index_lookup=index_lookup,
