@@ -278,7 +278,7 @@ def convert_crop(node, **kwargs):
     h, w = list(parse_helper(attrs, "h_w", [0, 0]))
     if num_inputs > 1:
         h, w = kwargs["out_shape"][-2:]
-    border = [y, x, y + h, x + w]
+    border = [x, y, x + w, y + h]
 
     conv_node = helper.make_node(
         "Crop",
