@@ -229,7 +229,9 @@ class MXNetGraph(object):
         input_pairs = {n: in_shape[i] for i, n in enumerate(input_names)}
         _, output_shapes, _ = sym.get_internals().infer_shape(**input_pairs)
 
-        output_names = [o[:-7] for o in sym.list_outputs() if o.endswith('_output')]
+        output_suffix = '_output'
+        output_names = [
+            o[:-len(output_suffix)] for o in sym.list_outputs() if o.endswith(output_suffix)]
 
         weights = MXNetGraph.convert_weights_to_numpy(params)
 
@@ -253,6 +255,7 @@ class MXNetGraph(object):
             # in params dict
             if op == "null" and name not in params:
                 # Handling graph input
+
                 # Skipping output_label node, as this node is not part of graph
                 # Refer "output_label" assignment above for more details.
                 if name == output_label:
