@@ -255,7 +255,6 @@ class MXNetGraph(object):
             # in params dict
             if op == "null" and name not in params:
                 # Handling graph input
-
                 # Skipping output_label node, as this node is not part of graph
                 # Refer "output_label" assignment above for more details.
                 if name == output_label:
