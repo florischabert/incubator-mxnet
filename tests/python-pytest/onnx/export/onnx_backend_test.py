@@ -98,6 +98,7 @@ BASIC_MODEL_TESTS = [
     'test_BatchNorm',
     'test_ConstantPad2d',
     'test_Conv2d',
+    'test_ConvTranspose2d'
     'test_ELU',
     'test_LeakyReLU',
     'test_MaxPool',

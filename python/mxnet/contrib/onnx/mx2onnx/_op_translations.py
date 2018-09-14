@@ -232,7 +232,7 @@ def convert_deconvolution(node, **kwargs):
     pad_dims = list(parse_helper(attrs, "pad", [0, 0]))
     num_group = int(attrs.get("num_group", 1))
     dilations = list(parse_helper(attrs, "dilate", [1, 1]))
-    adj_dims = list(parse_helper(attrs, "adj"))
+    adj_dims = list(parse_helper(attrs, "adj"), [0, 0])
 
     pad_dims = pad_dims + pad_dims
 
@@ -286,6 +286,10 @@ def convert_crop(node, **kwargs):
         scale=[1, 1],
         name=name
     )
+
+    logging.warning(
+        "Using an experimantal ONNX operator: Crop. " \
+        "Its definition can change.")
 
     return [crop_node]
 
