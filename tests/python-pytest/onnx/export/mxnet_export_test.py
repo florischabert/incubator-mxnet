@@ -97,10 +97,10 @@ def forward_pass(sym, arg, aux, data_names, input_data):
     batch = namedtuple('Batch', ['data'])
     mod.forward(batch([mx.nd.array(input_data)]), is_train=False)
 
-    return mod.get_outputs()[0].asnumpy()
+    return [output.asnumpy() for output in mod.get_outputs()]
 
 
-def test_models(model_name, input_shape, output_shape):
+def test_models(model_name, input_shape, output_shape, test_extra_output=False):
     """ Tests Googlenet model for both onnx import and export"""
     model_path, inputs, outputs = get_test_files(model_name)
     logging.info("Translating model from ONNX model zoo to Mxnet")
@@ -113,7 +113,13 @@ def test_models(model_name, input_shape, output_shape):
     new_model_name = "exported_" + model_name + ".onnx"
     onnx_file = os.path.join(dir_path, new_model_name)
 
-    logging.info("Translating converted model from mxnet to ONNX")
+    if test_extra_output:
+        logging.info("Adding extra output to model")
+        sym_output = sym.get_internals()[sym.list_outputs()[0]]
+        id_output = mx.sym.identity(data=sym_output)
+        sym = mx.symbol.Group([sym_output, id_output])
+
+    logging.info("Translating converted model from mxnet to ONNX")        
     converted_model_path = onnx_mxnet.export_model(sym, params, [input_shape], np.float32, onnx_file)
 
     sym, arg_params, aux_params = onnx_mxnet.import_model(converted_model_path)
@@ -129,11 +135,11 @@ def test_models(model_name, input_shape, output_shape):
     logging.info("Running inference on onnx re-import model in mxnet")
     # run test for each test file
     for input_data, output_data in zip(inputs, outputs):
-        result = forward_pass(sym, arg_params, aux_params, data_names, input_data)
-
-        # verify the results
-        npt.assert_equal(result.shape, output_data.shape)
-        npt.assert_almost_equal(output_data, result, decimal=3)
+        results = forward_pass(sym, arg_params, aux_params, data_names, input_data)
+        for result in results:
+            # verify the results
+            npt.assert_equal(result.shape, output_data.shape)
+            npt.assert_almost_equal(output_data, result, decimal=3)
     logging.info(model_name + " conversion successful")
 
 
@@ -149,7 +155,7 @@ def test_model_accuracy(model_name, input_shape):
 
     expected_result= []
     for input_data, output_data in zip(inputs, outputs):
-        result = forward_pass(sym, arg_params, aux_params, data_names, input_data)
+        result = forward_pass(sym, arg_params, aux_params, data_names, input_data)[0]
         expected_result.append(result)
 
     params = {}
@@ -171,7 +177,7 @@ def test_model_accuracy(model_name, input_shape):
 
     actual_result = []
     for input_data, output_data in zip(inputs, outputs):
-        result = forward_pass(sym, arg_params, aux_params, data_names, input_data)
+        result = forward_pass(sym, arg_params, aux_params, data_names, input_data)[0]
         actual_result.append(result)
 
     # verify the results
@@ -184,6 +190,7 @@ if __name__ == '__main__':
     test_models("bvlc_googlenet", (1, 3, 224, 224), (1, 1000))
     test_models("bvlc_reference_caffenet", (1, 3, 224, 224), (1, 1000))
     test_models("bvlc_reference_rcnn_ilsvrc13", (1, 3, 224, 224), (1, 200))
+    test_models("bvlc_googlenet", (1, 3, 224, 224), (1, 1000), test_extra_output=True)
 
     # Comparing MXNet inference result, since MXNet results don't match
     # ONNX expected results due to AveragePool issue github issue(#10194)
